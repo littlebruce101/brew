@@ -1,5 +1,7 @@
 # Homebrew
 
+> **ARCHIVED — exploratory work.** This repository is retained as a historical reference. See `ARCHIVE.md` for context and the rename mapping. Do not build on it directly.
+
 [![GitHub release](https://img.shields.io/github/release/Homebrew/brew.svg)](https://github.com/Homebrew/brew/releases)
 [![License](https://img.shields.io/github/license/Homebrew/brew)](https://github.com/Homebrew/brew/blob/HEAD/LICENSE.txt)
 
