@@ -207,5 +207,10 @@
 !/.cursor
 !/.claude
 
+# Unignore workspace and archive docs
+!/workspace
+!/ARCHIVE.md
+!/AGENTS.md
+
 # Ignore local AI configuration
 /.claude/settings.local.json
