@@ -188,7 +188,9 @@
 !/.shellcheckrc
 !/.vale.ini
 !/.yardopts
+!/AGENTS.md
 !/CHANGELOG.md
+!/CLAUDE.md
 !/CONTRIBUTING.md
 !/Dockerfile
 !/Dockerfile.test.yml
