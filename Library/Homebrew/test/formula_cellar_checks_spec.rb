@@ -3,6 +3,11 @@
 require "formula_cellar_checks"
 
 RSpec.describe FormulaCellarChecks do
+  # Prevent CoreTap from querying the remote API when the `formula` helper
+  # resolves the formula path via formula_files_by_name.
+  before { ENV["HOMEBREW_NO_INSTALL_FROM_API"] = "1" }
+  after  { ENV.delete("HOMEBREW_NO_INSTALL_FROM_API") }
+
   # Build a minimal concrete class that satisfies the abstract interface.
   let(:formula_prefix) { mktmpdir }
   let(:test_formula) do

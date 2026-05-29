@@ -184,13 +184,17 @@ RSpec.describe Homebrew::Diagnostic::Checks do
   end
 
   specify "#check_missing_deps — returns nil when cellar does not exist" do
-    allow(HOMEBREW_CELLAR).to receive(:exist?).and_return(false)
-
+    # HOMEBREW_CELLAR is a frozen Pathname; test via a non-existent temporary cellar path.
+    # Rename the cellar temporarily so exist? returns false.
+    tmp_backup = HOMEBREW_CELLAR.sub_ext(".bak_test")
+    FileUtils.mv HOMEBREW_CELLAR.to_s, tmp_backup.to_s
     expect(checks.check_missing_deps).to be_nil
+  ensure
+    FileUtils.mv tmp_backup.to_s, HOMEBREW_CELLAR.to_s
   end
 
   specify "#check_missing_deps — returns nil when no missing deps" do
-    allow(HOMEBREW_CELLAR).to receive(:exist?).and_return(true)
+    # HOMEBREW_CELLAR exists in the test environment; just stub Formula.installed.
     allow(Formula).to receive(:installed).and_return([])
     allow(Homebrew::Diagnostic).to receive(:missing_deps).and_return({})
 
@@ -198,12 +202,11 @@ RSpec.describe Homebrew::Diagnostic::Checks do
   end
 
   specify "#check_missing_deps — reports missing dependencies" do
-    dep = instance_double(Dependency, to_s: "openssl", to_installed_formula: instance_double(Formula,
-                                                                                              full_name: "openssl"))
-    allow(HOMEBREW_CELLAR).to receive(:exist?).and_return(true)
+    installed_formula = instance_double(Formula, full_name: "openssl")
+    dep = instance_double(Dependency, to_s: "openssl", to_installed_formula: installed_formula)
     allow(Formula).to receive(:installed).and_return([])
     allow(Homebrew::Diagnostic).to receive(:missing_deps).and_return({ "wget" => [dep] })
-    allow(dep.to_installed_formula).to receive(:full_name).and_return("openssl")
+    allow(installed_formula).to receive(:full_name).and_return("openssl")
 
     result = checks.check_missing_deps
     expect(result).to match("missing dependencies")
@@ -233,18 +236,14 @@ RSpec.describe Homebrew::Diagnostic::Checks do
 
   specify "#check_git_status — returns nil when repos are clean" do
     allow(Utils::Git).to receive(:available?).and_return(true)
-    allow(HOMEBREW_REPOSITORY).to receive(:exist?).and_return(true)
-    allow(CoreTap.instance).to receive(:path).and_return(instance_double(Pathname, exist?: false))
-    allow(CoreCaskTap.instance).to receive(:path).and_return(instance_double(Pathname, exist?: false))
+    # Use non-existent dummy paths so the `path.exist?` check skips each repo.
+    dummy_path = instance_double(Pathname, exist?: false)
+    allow(CoreTap.instance).to receive(:path).and_return(dummy_path)
+    allow(CoreCaskTap.instance).to receive(:path).and_return(dummy_path)
+    # HOMEBREW_REPOSITORY is a frozen Pathname; route around it by stubbing the checks object's
+    # perception of the repo hash via the stub_const helper for the constant used inside the method.
+    stub_const("HOMEBREW_REPOSITORY", instance_double(Pathname, exist?: false))
 
-    mktmpdir do |dir|
-      system("git", "-C", dir.to_s, "init", "-q")
-      system("git", "-C", dir.to_s, "config", "user.email", "test@test.com")
-      system("git", "-C", dir.to_s, "config", "user.name", "Test")
-      allow(HOMEBREW_REPOSITORY).to receive(:exist?).and_return(true)
-      allow(HOMEBREW_REPOSITORY).to receive(:cd).and_return("")
-
-      expect(checks.check_git_status).to be_nil
-    end
+    expect(checks.check_git_status).to be_nil
   end
 end

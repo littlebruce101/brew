@@ -121,8 +121,8 @@ RSpec.describe AbstractFileDownloadStrategy do
   end
 
   describe "#cached_location" do
-    it "returns a Pathname under the downloads subdirectory of the cache" do
-      expect(strategy.cached_location.to_s).to include((cache_dir/"downloads").to_s)
+    it "returns a Pathname under HOMEBREW_CACHE/downloads" do
+      expect(strategy.cached_location.to_s).to include((HOMEBREW_CACHE/"downloads").to_s)
     end
 
     it "encodes the URL as a SHA-256 prefix in the filename" do
