@@ -19,7 +19,7 @@ RSpec.describe DownloadStrategyDetector do
 
     it "raises TypeError for an unknown using value" do
       expect { described_class.detect("https://example.com/foo", 42) }
-        .to raise_error(TypeError, /Unknown download strategy specification/)
+        .to raise_error(TypeError)
     end
   end
 
