@@ -130,4 +130,120 @@ RSpec.describe Homebrew::Diagnostic::Checks do
 
     expect(checks.check_for_unnecessary_cask_tap).to match("unnecessary local Cask tap")
   end
+
+  specify "#check_deprecated_official_taps — reports deprecated taps that are installed" do
+    deprecated_tap = instance_double(Tap, official?: true, repository: "science")
+    allow(Tap).to receive(:select).and_yield(deprecated_tap).and_return([deprecated_tap])
+
+    expect(checks.check_deprecated_official_taps).to match("homebrew-science")
+  end
+
+  specify "#check_deprecated_official_taps — returns nil when no deprecated taps installed" do
+    allow(Tap).to receive(:select).and_return([])
+
+    expect(checks.check_deprecated_official_taps).to be_nil
+  end
+
+  specify "#check_deprecated_official_taps — skips bundle tap in CI" do
+    bundle_tap = instance_double(Tap, official?: true, repository: "bundle")
+    allow(Tap).to receive(:select).and_return([bundle_tap])
+    ENV["GITHUB_ACTIONS"] = "true"
+
+    expect(checks.check_deprecated_official_taps).to be_nil
+  ensure
+    ENV.delete("GITHUB_ACTIONS")
+  end
+
+  specify "#check_for_duplicate_formulae — returns nil when no shadowing" do
+    allow(CoreTap.instance).to receive(:formula_names).and_return(["wget", "curl"])
+    allow(checks).to receive(:non_core_taps).and_return([])
+
+    expect(checks.check_for_duplicate_formulae).to be_nil
+  end
+
+  specify "#check_for_duplicate_formulae — reports formulae that shadow core" do
+    non_core_tap = instance_double(Tap,
+                                   name:          "user/custom",
+                                   formula_names: ["user/custom/wget"],
+                                   official?:     false)
+    allow(CoreTap.instance).to receive(:formula_names).and_return(["wget"])
+    allow(checks).to receive(:non_core_taps).and_return([non_core_tap])
+    allow(Formula).to receive(:installed).and_return([])
+
+    result = checks.check_for_duplicate_formulae
+    expect(result).to match("user/custom/wget")
+    expect(result).to match("brew untap user/custom")
+  end
+
+  specify "#check_for_duplicate_formulae — skipped in test-bot environment" do
+    ENV["HOMEBREW_TEST_BOT"] = "1"
+
+    expect(checks.check_for_duplicate_formulae).to be_nil
+  ensure
+    ENV.delete("HOMEBREW_TEST_BOT")
+  end
+
+  specify "#check_missing_deps — returns nil when cellar does not exist" do
+    # HOMEBREW_CELLAR is a frozen Pathname; test via a non-existent temporary cellar path.
+    # Rename the cellar temporarily so exist? returns false.
+    tmp_backup = HOMEBREW_CELLAR.sub_ext(".bak_test")
+    FileUtils.mv HOMEBREW_CELLAR.to_s, tmp_backup.to_s
+    expect(checks.check_missing_deps).to be_nil
+  ensure
+    FileUtils.mv tmp_backup.to_s, HOMEBREW_CELLAR.to_s
+  end
+
+  specify "#check_missing_deps — returns nil when no missing deps" do
+    # HOMEBREW_CELLAR exists in the test environment; just stub Formula.installed.
+    allow(Formula).to receive(:installed).and_return([])
+    allow(Homebrew::Diagnostic).to receive(:missing_deps).and_return({})
+
+    expect(checks.check_missing_deps).to be_nil
+  end
+
+  specify "#check_missing_deps — reports missing dependencies" do
+    installed_formula = instance_double(Formula, full_name: "openssl")
+    dep = instance_double(Dependency, to_s: "openssl", to_installed_formula: installed_formula)
+    allow(Formula).to receive(:installed).and_return([])
+    allow(Homebrew::Diagnostic).to receive(:missing_deps).and_return({ "wget" => [dep] })
+    allow(installed_formula).to receive(:full_name).and_return("openssl")
+
+    result = checks.check_missing_deps
+    expect(result).to match("missing dependencies")
+    expect(result).to match("brew install")
+  end
+
+  specify "#check_deprecated_cask_taps — returns nil when no deprecated cask taps" do
+    allow(Tap).to receive(:select).and_return([])
+
+    expect(checks.check_deprecated_cask_taps).to be_nil
+  end
+
+  specify "#check_deprecated_cask_taps — reports caskroom taps" do
+    cask_tap = instance_double(Tap, user: "caskroom", name: "caskroom/fonts")
+    allow(Tap).to receive(:select).and_return([cask_tap])
+
+    result = checks.check_deprecated_cask_taps
+    expect(result).to match("caskroom/fonts")
+    expect(result).to match("brew untap")
+  end
+
+  specify "#check_git_status — returns nil when git is unavailable" do
+    allow(Utils::Git).to receive(:available?).and_return(false)
+
+    expect(checks.check_git_status).to be_nil
+  end
+
+  specify "#check_git_status — returns nil when repos are clean" do
+    allow(Utils::Git).to receive(:available?).and_return(true)
+    # Use non-existent dummy paths so the `path.exist?` check skips each repo.
+    dummy_path = instance_double(Pathname, exist?: false)
+    allow(CoreTap.instance).to receive(:path).and_return(dummy_path)
+    allow(CoreCaskTap.instance).to receive(:path).and_return(dummy_path)
+    # HOMEBREW_REPOSITORY is a frozen Pathname; route around it by stubbing the checks object's
+    # perception of the repo hash via the stub_const helper for the constant used inside the method.
+    stub_const("HOMEBREW_REPOSITORY", instance_double(Pathname, exist?: false))
+
+    expect(checks.check_git_status).to be_nil
+  end
 end
